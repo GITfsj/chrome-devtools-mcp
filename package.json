@@ -1,7 +1,7 @@
 {
-  "name": "chrome-devtools-mcp",
-  "version": "0.10.1",
-  "description": "MCP server for Chrome DevTools",
+  "name": "@tencent/chrome-devtools-mcp-plus",
+  "version": "0.0.1-beta.1",
+  "description": "MCP server for Chrome DevTools Make With Customized",
   "type": "module",
   "bin": "./build/src/index.js",
   "main": "index.js",
@@ -31,7 +31,7 @@
     "!*.tsbuildinfo"
   ],
   "repository": "ChromeDevTools/chrome-devtools-mcp",
-  "author": "Google LLC",
+  "author": "Google LLC、joseaufeng",
   "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/issues"
@@ -71,5 +71,8 @@
   },
   "engines": {
     "node": "^20.19.0 || ^22.12.0 || >=23"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
   }
 }

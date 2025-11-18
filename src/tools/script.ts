@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {readFile} from 'fs/promises';
+import {resolve} from 'path';
+
 import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page} from '../third_party/index.js';
 
@@ -81,6 +84,55 @@ Example with arguments: \`(el) => {
       });
     } finally {
       void Promise.allSettled(args.map(arg => arg.dispose()));
+    }
+  },
+});
+
+export const injectLocalScript = defineTool({
+  name: 'inject_local_script',
+  description: `Inject a local JavaScript file into the currently selected page. The script will be executed in the page context.`,
+  annotations: {
+    category: ToolCategory.DEBUGGING,
+    readOnlyHint: false,
+  },
+  schema: {
+    filePath: zod
+      .string()
+      .describe(
+        `Absolute path to the local JavaScript file to inject into the browser page.`,
+      ),
+  },
+  handler: async (request, response, context) => {
+    try {
+      // Resolve the absolute path
+      const absolutePath = resolve(request.params.filePath);
+
+      // Read the file content
+      const scriptContent = await readFile(absolutePath, 'utf-8');
+
+      // Get the current page
+      const page = context.getSelectedPage();
+
+      // Execute the script in the page context
+      await context.waitForEventsAfterAction(async () => {
+        const result = await page.evaluate(scriptContent);
+
+        response.appendResponseLine(
+          `Script from file "${absolutePath}" injected successfully.`,
+        );
+
+        if (result !== undefined) {
+          response.appendResponseLine('Script execution returned:');
+          response.appendResponseLine('```json');
+          response.appendResponseLine(JSON.stringify(result, null, 2));
+          response.appendResponseLine('```');
+        }
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to inject script: ${error.message}`);
+      }
+      throw error;
     }
   },
 });

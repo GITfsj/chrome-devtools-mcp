@@ -148,4 +148,132 @@ describe('snapshotFormatter', () => {
 `,
     );
   });
+
+  it('skips elements with specified roles', () => {
+    const node: TextSnapshotNode = {
+      id: '1_1',
+      role: 'root',
+      name: 'root',
+      children: [
+        {
+          id: '1_2',
+          role: 'image',
+          name: 'An image',
+          children: [],
+          elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+            return null;
+          },
+        },
+        {
+          id: '1_3',
+          role: 'button',
+          name: 'button',
+          children: [],
+          elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+            return null;
+          },
+        },
+        {
+          id: '1_4',
+          role: 'img',
+          name: 'Another image',
+          children: [],
+          elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+            return null;
+          },
+        },
+      ],
+      elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+        return null;
+      },
+    };
+
+    const formatted = formatSnapshotNode(node, undefined, 0, ['image', 'img']);
+    assert.strictEqual(
+      formatted,
+      `uid=1_1 root "root"
+  uid=1_3 button "button"
+`,
+    );
+  });
+
+  it('includes all elements when skipRoles is not provided', () => {
+    const node: TextSnapshotNode = {
+      id: '1_1',
+      role: 'root',
+      name: 'root',
+      children: [
+        {
+          id: '1_2',
+          role: 'image',
+          name: 'An image',
+          children: [],
+          elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+            return null;
+          },
+        },
+        {
+          id: '1_3',
+          role: 'button',
+          name: 'button',
+          children: [],
+          elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+            return null;
+          },
+        },
+      ],
+      elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+        return null;
+      },
+    };
+
+    const formatted = formatSnapshotNode(node);
+    assert.strictEqual(
+      formatted,
+      `uid=1_1 root "root"
+  uid=1_2 image "An image"
+  uid=1_3 button "button"
+`,
+    );
+  });
+
+  it('skips nested elements with specified roles', () => {
+    const node: TextSnapshotNode = {
+      id: '1_1',
+      role: 'root',
+      name: 'root',
+      children: [
+        {
+          id: '1_2',
+          role: 'button',
+          name: 'button',
+          children: [
+            {
+              id: '1_3',
+              role: 'image',
+              name: 'nested image',
+              children: [],
+              elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+                return null;
+              },
+            },
+          ],
+          elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+            return null;
+          },
+        },
+      ],
+      elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+        return null;
+      },
+    };
+
+    const formatted = formatSnapshotNode(node, undefined, 0, ['image']);
+    assert.strictEqual(
+      formatted,
+      `uid=1_1 root "root"
+  uid=1_2 button "button"
+`,
+    );
+  });
 });

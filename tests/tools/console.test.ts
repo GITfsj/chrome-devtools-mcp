@@ -48,6 +48,46 @@ describe('console', () => {
         );
       });
     });
+
+    it('lists messages in reverse order', async () => {
+      await withBrowser(async (response, context) => {
+        const page = await context.newPage();
+        await page.setContent(
+          '<script>console.log("first"); console.log("second"); console.log("third");</script>',
+        );
+        await listConsoleMessages.handler(
+          {params: {reverse: true}},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle('test', context);
+        const textContent = formattedResponse[0] as {text: string};
+        const lines = textContent.text.split('\n');
+        const messageLines = lines.filter(line => line.includes('[log]'));
+        // 倒序时，最新的消息应该在前面
+        assert.ok(messageLines[0].includes('third'));
+        assert.ok(messageLines[1].includes('second'));
+        assert.ok(messageLines[2].includes('first'));
+      });
+    });
+
+    it('lists messages in chronological order by default', async () => {
+      await withBrowser(async (response, context) => {
+        const page = await context.newPage();
+        await page.setContent(
+          '<script>console.log("first"); console.log("second"); console.log("third");</script>',
+        );
+        await listConsoleMessages.handler({params: {}}, response, context);
+        const formattedResponse = await response.handle('test', context);
+        const textContent = formattedResponse[0] as {text: string};
+        const lines = textContent.text.split('\n');
+        const messageLines = lines.filter(line => line.includes('[log]'));
+        // 默认顺序时，最早的消息应该在前面
+        assert.ok(messageLines[0].includes('first'));
+        assert.ok(messageLines[1].includes('second'));
+        assert.ok(messageLines[2].includes('third'));
+      });
+    });
   });
 
   describe('get_console_message', () => {

@@ -69,6 +69,13 @@ export const listNetworkRequests = defineTool({
       .describe(
         'Set to true to return the preserved requests over the last 3 navigations.',
       ),
+    reverse: zod
+      .boolean()
+      .default(true)
+      .optional()
+      .describe(
+        'Set to true to return requests in reverse order (newest first). When false or omitted, returns requests in chronological order (oldest first). Default is true',
+      ),
   },
   handler: async (request, response, context) => {
     const data = await context.getDevToolsData();
@@ -82,6 +89,7 @@ export const listNetworkRequests = defineTool({
       resourceTypes: request.params.resourceTypes,
       includePreservedRequests: request.params.includePreservedRequests,
       networkRequestIdInDevToolsUI: reqid,
+      reverse: request.params.reverse,
     });
   },
 });

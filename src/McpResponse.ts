@@ -46,12 +46,14 @@ export class McpResponse implements Response {
     resourceTypes?: ResourceType[];
     includePreservedRequests?: boolean;
     networkRequestIdInDevToolsUI?: number;
+    reverse?: boolean;
   };
   #consoleDataOptions?: {
     include: boolean;
     pagination?: PaginationOptions;
     types?: string[];
     includePreservedMessages?: boolean;
+    reverse?: boolean;
   };
   #devToolsData?: DevToolsData;
 
@@ -66,6 +68,7 @@ export class McpResponse implements Response {
   includeSnapshot(params?: SnapshotParams): void {
     this.#snapshotParams = params ?? {
       verbose: false,
+      skipRoles: ['image', 'img'],
     };
   }
 
@@ -75,6 +78,7 @@ export class McpResponse implements Response {
       resourceTypes?: ResourceType[];
       includePreservedRequests?: boolean;
       networkRequestIdInDevToolsUI?: number;
+      reverse?: boolean;
     },
   ): void {
     if (!value) {
@@ -94,6 +98,7 @@ export class McpResponse implements Response {
       resourceTypes: options?.resourceTypes,
       includePreservedRequests: options?.includePreservedRequests,
       networkRequestIdInDevToolsUI: options?.networkRequestIdInDevToolsUI,
+      reverse: options?.reverse,
     };
   }
 
@@ -102,6 +107,7 @@ export class McpResponse implements Response {
     options?: PaginationOptions & {
       types?: string[];
       includePreservedMessages?: boolean;
+      reverse?: boolean;
     },
   ): void {
     if (!value) {
@@ -120,6 +126,7 @@ export class McpResponse implements Response {
           : undefined,
       types: options?.types,
       includePreservedMessages: options?.includePreservedMessages,
+      reverse: options?.reverse,
     };
   }
 
@@ -194,13 +201,23 @@ export class McpResponse implements Response {
         if (this.#snapshotParams.filePath) {
           await context.saveFile(
             new TextEncoder().encode(
-              formatSnapshotNode(snapshot.root, snapshot),
+              formatSnapshotNode(
+                snapshot.root,
+                snapshot,
+                0,
+                this.#snapshotParams.skipRoles,
+              ),
             ),
             this.#snapshotParams.filePath,
           );
           formattedSnapshot = `Saved snapshot to ${this.#snapshotParams.filePath}.`;
         } else {
-          formattedSnapshot = formatSnapshotNode(snapshot.root, snapshot);
+          formattedSnapshot = formatSnapshotNode(
+            snapshot.root,
+            snapshot,
+            0,
+            this.#snapshotParams.skipRoles,
+          );
         }
       }
     }
@@ -398,6 +415,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
         const data = this.#dataWithPagination(
           requests,
           this.#networkRequestsOptions.pagination,
+          this.#networkRequestsOptions.reverse,
         );
         response.push(...data.info);
         for (const request of data.items) {
@@ -423,6 +441,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
         const data = this.#dataWithPagination(
           messages,
           this.#consoleDataOptions.pagination,
+          this.#consoleDataOptions.reverse,
         );
         response.push(...data.info);
         response.push(
@@ -447,16 +466,23 @@ Call ${handleDialog.name} to handle it before continuing.`);
     return [text, ...images];
   }
 
-  #dataWithPagination<T>(data: T[], pagination?: PaginationOptions) {
+  #dataWithPagination<T>(
+    data: T[],
+    pagination?: PaginationOptions,
+    reverse?: boolean,
+  ) {
+    // 如果需要倒序，先反转数组
+    const sortedData = reverse ? [...data].reverse() : data;
+    
     const response = [];
-    const paginationResult = paginate<T>(data, pagination);
+    const paginationResult = paginate<T>(sortedData, pagination);
     if (paginationResult.invalidPage) {
       response.push('Invalid page number provided. Showing first page.');
     }
 
     const {startIndex, endIndex, currentPage, totalPages} = paginationResult;
     response.push(
-      `Showing ${startIndex + 1}-${endIndex} of ${data.length} (Page ${currentPage + 1} of ${totalPages}).`,
+      `Showing ${startIndex + 1}-${endIndex} of ${sortedData.length} (Page ${currentPage + 1} of ${totalPages}).`,
     );
     if (pagination) {
       if (paginationResult.hasNextPage) {

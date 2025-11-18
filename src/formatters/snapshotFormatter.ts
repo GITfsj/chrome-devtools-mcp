@@ -9,8 +9,15 @@ export function formatSnapshotNode(
   root: TextSnapshotNode,
   snapshot?: TextSnapshot,
   depth = 0,
+  skipRoles?: string[],
 ): string {
   let result = '';
+  
+  // Skip elements based on role configuration
+  if (root.role && skipRoles?.includes(root.role)) {
+    return result;
+  }
+  
   const attributes = getAttributes(root);
   const line =
     ' '.repeat(depth * 2) +
@@ -22,7 +29,7 @@ export function formatSnapshotNode(
   result += line;
 
   for (const child of root.children) {
-    result += formatSnapshotNode(child, snapshot, depth + 1);
+    result += formatSnapshotNode(child, snapshot, depth + 1, skipRoles);
   }
 
   return result;

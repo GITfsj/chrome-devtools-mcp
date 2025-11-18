@@ -73,6 +73,13 @@ export const listConsoleMessages = defineTool({
       .describe(
         'Set to true to return the preserved messages over the last 3 navigations.',
       ),
+    reverse: zod
+      .boolean()
+      .default(true)
+      .optional()
+      .describe(
+        'Set to true to return messages in reverse order (newest first). When false or omitted, returns messages in chronological order (oldest first). Default is true',
+      ),
   },
   handler: async (request, response) => {
     response.setIncludeConsoleData(true, {
@@ -80,6 +87,7 @@ export const listConsoleMessages = defineTool({
       pageIdx: request.params.pageIdx,
       types: request.params.types,
       includePreservedMessages: request.params.includePreservedMessages,
+      reverse: request.params.reverse,
     });
   },
 });

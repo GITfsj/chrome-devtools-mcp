@@ -45,6 +45,7 @@ export interface ImageContentData {
 export interface SnapshotParams {
   verbose?: boolean;
   filePath?: string;
+  skipRoles?: string[];
 }
 
 export interface DevToolsData {
@@ -61,6 +62,7 @@ export interface Response {
       resourceTypes?: string[];
       includePreservedRequests?: boolean;
       networkRequestIdInDevToolsUI?: number;
+      reverse?: boolean;
     },
   ): void;
   setIncludeConsoleData(
@@ -68,6 +70,7 @@ export interface Response {
     options?: PaginationOptions & {
       types?: string[];
       includePreservedMessages?: boolean;
+      reverse?: boolean;
     },
   ): void;
   includeSnapshot(params?: SnapshotParams): void;

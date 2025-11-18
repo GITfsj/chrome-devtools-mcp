@@ -109,6 +109,73 @@ describe('network', () => {
         t.assert.snapshot?.(stabilizeResponseOutput(responseData[0].text));
       });
     });
+
+    it('list requests in reverse order', async () => {
+      server.addHtmlRoute('/one', html`<main>First</main>`);
+      server.addHtmlRoute('/two', html`<main>Second</main>`);
+      server.addHtmlRoute('/three', html`<main>Third</main>`);
+
+      await withBrowser(async (response, context) => {
+        await context.setUpNetworkCollectorForTesting();
+        const page = context.getSelectedPage();
+        await page.goto(server.getRoute('/one'));
+        await page.goto(server.getRoute('/two'));
+        await page.goto(server.getRoute('/three'));
+        await listNetworkRequests.handler(
+          {
+            params: {
+              includePreservedRequests: true,
+              reverse: true,
+            },
+          },
+          response,
+          context,
+        );
+        const responseData = await response.handle('list_request', context);
+        const textContent = responseData[0] as {text: string};
+        // 验证最新的请求 (three) 出现在最前面
+        assert.ok(textContent.text.includes('/three'));
+        const threeIndex = textContent.text.indexOf('/three');
+        const twoIndex = textContent.text.indexOf('/two');
+        const oneIndex = textContent.text.indexOf('/one');
+        // 在倒序中，three 应该在 two 之前，two 应该在 one 之前
+        assert.ok(threeIndex < twoIndex);
+        assert.ok(twoIndex < oneIndex);
+      });
+    });
+
+    it('list requests in chronological order by default', async () => {
+      server.addHtmlRoute('/one', html`<main>First</main>`);
+      server.addHtmlRoute('/two', html`<main>Second</main>`);
+      server.addHtmlRoute('/three', html`<main>Third</main>`);
+
+      await withBrowser(async (response, context) => {
+        await context.setUpNetworkCollectorForTesting();
+        const page = context.getSelectedPage();
+        await page.goto(server.getRoute('/one'));
+        await page.goto(server.getRoute('/two'));
+        await page.goto(server.getRoute('/three'));
+        await listNetworkRequests.handler(
+          {
+            params: {
+              includePreservedRequests: true,
+            },
+          },
+          response,
+          context,
+        );
+        const responseData = await response.handle('list_request', context);
+        const textContent = responseData[0] as {text: string};
+        // 验证最早的请求 (one) 出现在最前面
+        assert.ok(textContent.text.includes('/one'));
+        const oneIndex = textContent.text.indexOf('/one');
+        const twoIndex = textContent.text.indexOf('/two');
+        const threeIndex = textContent.text.indexOf('/three');
+        // 在正序中，one 应该在 two 之前，two 应该在 three 之前
+        assert.ok(oneIndex < twoIndex);
+        assert.ok(twoIndex < threeIndex);
+      });
+    });
   });
   describe('network_get_request', () => {
     it('attaches request', async () => {

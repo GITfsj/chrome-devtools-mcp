@@ -32,11 +32,18 @@ in the DevTools Elements panel (if any).`,
       .describe(
         'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.',
       ),
+    skipRoles: zod
+      .array(zod.string())
+      .optional()
+      .describe(
+        'Array of role names to skip in the snapshot (e.g., ["img", "image"] to skip image elements). Default skips image and img roles.',
+      ),
   },
   handler: async (request, response) => {
     response.includeSnapshot({
       verbose: request.params.verbose ?? false,
       filePath: request.params.filePath,
+      skipRoles: request.params.skipRoles ?? ['image', 'img'],
     });
   },
 });

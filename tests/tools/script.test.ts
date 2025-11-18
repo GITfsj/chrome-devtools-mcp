@@ -5,8 +5,11 @@
  */
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
+import {writeFile, unlink} from 'node:fs/promises';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
 
-import {evaluateScript} from '../../src/tools/script.js';
+import {evaluateScript, injectLocalScript} from '../../src/tools/script.js';
 import {serverHooks} from '../server.js';
 import {html, withBrowser} from '../utils.js';
 
@@ -181,6 +184,95 @@ describe('script', () => {
         );
         const lineEvaluation = response.responseLines.at(2)!;
         assert.strictEqual(JSON.parse(lineEvaluation), 'I am iframe button');
+      });
+    });
+  });
+
+  describe('inject_local_script', () => {
+    it('injects a simple script', async () => {
+      await withBrowser(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(html`<div id="test">Original</div>`);
+
+        // Create a temporary JS file
+        const scriptPath = join(tmpdir(), 'test-inject-script.js');
+        const scriptContent = `
+          document.getElementById('test').textContent = 'Modified';
+        `;
+        await writeFile(scriptPath, scriptContent, 'utf-8');
+
+        try {
+          await injectLocalScript.handler(
+            {params: {filePath: scriptPath}},
+            response,
+            context,
+          );
+
+          // Verify the script was executed
+          const text = await page.$eval('#test', el => el.textContent);
+          assert.strictEqual(text, 'Modified');
+          assert.ok(
+            response.responseLines.some(line =>
+              line.includes('injected successfully'),
+            ),
+          );
+        } finally {
+          await unlink(scriptPath);
+        }
+      });
+    });
+
+    it('injects script with return value', async () => {
+      await withBrowser(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(html`<div id="test">Content</div>`);
+
+        // Create a temporary JS file that returns a value
+        const scriptPath = join(tmpdir(), 'test-inject-return.js');
+        const scriptContent = `
+          (function() {
+            return {
+              title: document.title,
+              elementCount: document.querySelectorAll('*').length
+            };
+          })()
+        `;
+        await writeFile(scriptPath, scriptContent, 'utf-8');
+
+        try {
+          await injectLocalScript.handler(
+            {params: {filePath: scriptPath}},
+            response,
+            context,
+          );
+
+          // Check that response includes the return value
+          const jsonLine = response.responseLines.find(line =>
+            line.includes('elementCount'),
+          );
+          assert.ok(jsonLine);
+        } finally {
+          await unlink(scriptPath);
+        }
+      });
+    });
+
+    it('handles file not found error', async () => {
+      await withBrowser(async (response, context) => {
+        const nonExistentPath = '/tmp/non-existent-script-file.js';
+
+        await assert.rejects(
+          async () => {
+            await injectLocalScript.handler(
+              {params: {filePath: nonExistentPath}},
+              response,
+              context,
+            );
+          },
+          {
+            message: /Failed to inject script/,
+          },
+        );
       });
     });
   });
