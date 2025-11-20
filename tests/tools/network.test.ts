@@ -7,6 +7,7 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {
+  getNetworkDetail,
   getNetworkRequest,
   listNetworkRequests,
 } from '../../src/tools/network.js';
@@ -226,6 +227,142 @@ describe('network', () => {
         const responseData = await response.handle('get_request', context);
 
         t.assert.snapshot?.(stabilizeResponseOutput(responseData[0].text));
+      });
+    });
+  });
+  describe('network_get_detail', () => {
+    it('should get all data by default', async () => {
+      server.addHtmlRoute('/test', html`<main>Test Page</main>`);
+
+      await withBrowser(async (response, context) => {
+        await context.setUpNetworkCollectorForTesting();
+        const page = context.getSelectedPage();
+        await page.goto(server.getRoute('/test'));
+        
+        await getNetworkDetail.handler(
+          {
+            params: {
+              reqid: 1,
+            },
+          },
+          response,
+          context,
+        );
+        
+        assert.equal(response.attachedNetworkRequestId, 1);
+        const responseData = await response.handle('get_detail', context);
+        const textContent = responseData[0] as {text: string};
+        assert.ok(textContent.text.includes('both request and response data'));
+      });
+    });
+
+    it('should get request data only', async () => {
+      server.addHtmlRoute('/test', html`<main>Test Page</main>`);
+
+      await withBrowser(async (response, context) => {
+        await context.setUpNetworkCollectorForTesting();
+        const page = context.getSelectedPage();
+        await page.goto(server.getRoute('/test'));
+        
+        await getNetworkDetail.handler(
+          {
+            params: {
+              reqid: 1,
+              dataType: 'request',
+            },
+          },
+          response,
+          context,
+        );
+        
+        const responseData = await response.handle('get_detail', context);
+        const textContent = responseData[0] as {text: string};
+        assert.ok(textContent.text.includes('request data only'));
+        assert.ok(textContent.text.includes('Request Headers'));
+      });
+    });
+
+    it('should get response data only', async () => {
+      server.addHtmlRoute('/test', html`<main>Test Page</main>`);
+
+      await withBrowser(async (response, context) => {
+        await context.setUpNetworkCollectorForTesting();
+        const page = context.getSelectedPage();
+        await page.goto(server.getRoute('/test'));
+        
+        await getNetworkDetail.handler(
+          {
+            params: {
+              reqid: 1,
+              dataType: 'response',
+            },
+          },
+          response,
+          context,
+        );
+        
+        const responseData = await response.handle('get_detail', context);
+        const textContent = responseData[0] as {text: string};
+        assert.ok(textContent.text.includes('response data only'));
+        assert.ok(textContent.text.includes('Response Headers'));
+      });
+    });
+
+    it('should work with list_network_requests integration', async () => {
+      server.addHtmlRoute('/page1', html`<main>Page 1</main>`);
+      server.addHtmlRoute('/page2', html`<main>Page 2</main>`);
+
+      await withBrowser(async (response1, context) => {
+        await context.setUpNetworkCollectorForTesting();
+        const page = context.getSelectedPage();
+        await page.goto(server.getRoute('/page1'));
+        await page.goto(server.getRoute('/page2'));
+        
+        // 首先列出所有请求
+        await listNetworkRequests.handler(
+          {
+            params: {
+              includePreservedRequests: true,
+            },
+          },
+          response1,
+          context,
+        );
+        
+        const listResponse = await response1.handle('list_requests', context);
+        const listText = listResponse[0] as {text: string};
+        
+        // 从列表中找到 reqid（通常格式为 reqid=1）
+        const reqidMatch = listText.text.match(/reqid=(\\d+)/);
+        assert.ok(reqidMatch, 'Should find reqid in list response');
+        
+        const reqid = parseInt(reqidMatch[1], 10);
+        
+        // 然后获取该请求的详细信息
+        const response2 = {
+          attachNetworkRequest: (id: number) => {
+            response2.attachedNetworkRequestId = id;
+          },
+          appendResponseLine: (line: string) => {
+            response2.lines.push(line);
+          },
+          attachedNetworkRequestId: undefined as number | undefined,
+          lines: [] as string[],
+        };
+        
+        await getNetworkDetail.handler(
+          {
+            params: {
+              reqid,
+              dataType: 'all',
+            },
+          },
+          response2 as any,
+          context,
+        );
+        
+        assert.equal(response2.attachedNetworkRequestId, reqid);
+        assert.ok(response2.lines.some(line => line.includes('both request and response data')));
       });
     });
   });

@@ -7,6 +7,12 @@
 import {zod} from '../third_party/index.js';
 import type {ResourceType} from '../third_party/index.js';
 
+import {
+  getFormattedHeaderValue,
+  getFormattedRequestBody,
+  getFormattedResponseBody,
+  getStatusFromRequest,
+} from '../formatters/networkFormatter.js';
 import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
@@ -48,14 +54,14 @@ export const listNetworkRequests = defineTool({
       .describe(
         'Maximum number of requests to return. When omitted, returns all requests.',
       ),
-    pageIdx: zod
-      .number()
-      .int()
-      .min(0)
-      .optional()
-      .describe(
-        'Page number to return (0-based). When omitted, returns the first page.',
-      ),
+    // pageIdx: zod
+    //   .number()
+    //   .int()
+    //   .min(0)
+    //   .optional()
+    //   .describe(
+    //     'Page number to return (0-based). When omitted, returns the first page.',
+    //   ),
     resourceTypes: zod
       .array(zod.enum(FILTERABLE_RESOURCE_TYPES))
       .optional()
@@ -85,7 +91,8 @@ export const listNetworkRequests = defineTool({
       : undefined;
     response.setIncludeNetworkRequests(true, {
       pageSize: request.params.pageSize,
-      pageIdx: request.params.pageIdx,
+      // pageIdx: request.params.pageIdx,
+      pageIdx: 0,
       resourceTypes: request.params.resourceTypes,
       includePreservedRequests: request.params.includePreservedRequests,
       networkRequestIdInDevToolsUI: reqid,
@@ -124,6 +131,103 @@ export const getNetworkRequest = defineTool({
         response.appendResponseLine(
           `Nothing is currently selected in the DevTools Network panel.`,
         );
+      }
+    }
+  },
+});
+
+export const getNetworkDetail = defineTool({
+  name: 'get_network_detail',
+  description: `Get detailed information for a specific network request. Works with list_network_requests to retrieve detailed data for a specific request. Supports selective data retrieval to avoid context pollution.`,
+  annotations: {
+    category: ToolCategory.NETWORK,
+    readOnlyHint: true,
+  },
+  schema: {
+    reqid: zod
+      .number()
+      .describe(
+        'The reqid of the network request from list_network_requests.',
+      ),
+    dataType: zod
+      .enum(['all', 'request', 'response'])
+      .default('all')
+      .optional()
+      .describe(
+        'Specify which data to return: "all" (both request and response), "request" (only request data), "response" (only response data). Default is "all".',
+      ),
+  },
+  handler: async (request, response, context) => {
+    const {reqid, dataType = 'all'} = request.params;
+
+    // 获取网络请求对象
+    let httpRequest;
+    try {
+      httpRequest = context.getNetworkRequestById(reqid);
+    } catch (error) {
+      response.appendResponseLine(
+        `Network request with reqid=${reqid} not found: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return;
+    }
+
+    const httpResponse = httpRequest.response();
+    
+    // 根据 dataType 构建响应内容
+    response.appendResponseLine(`## Request ${httpRequest.url()}`);
+    response.appendResponseLine(`Status: ${getStatusFromRequest(httpRequest)}`);
+
+    // 包含请求数据
+    if (dataType === 'all' || dataType === 'request') {
+      // The header's context is too long
+      // response.appendResponseLine('### Request Headers');
+      // for (const line of getFormattedHeaderValue(httpRequest.headers())) {
+      //   response.appendResponseLine(line);
+      // }
+
+      const requestBody = await getFormattedRequestBody(httpRequest);
+      if (requestBody) {
+        response.appendResponseLine('### Request Body');
+        response.appendResponseLine(requestBody);
+      }
+    }
+
+    // 包含响应数据
+    if (dataType === 'all' || dataType === 'response') {
+      if (httpResponse) {
+        response.appendResponseLine('### Response Headers');
+        for (const line of getFormattedHeaderValue(httpResponse.headers())) {
+          response.appendResponseLine(line);
+        }
+
+        const responseBody = await getFormattedResponseBody(httpResponse);
+        if (responseBody) {
+          response.appendResponseLine('### Response Body');
+          response.appendResponseLine(responseBody);
+        }
+      } else {
+        response.appendResponseLine('### Response');
+        response.appendResponseLine('No response available.');
+      }
+    }
+
+    // 如果有失败信息
+    const httpFailure = httpRequest.failure();
+    if (httpFailure && (dataType === 'all' || dataType === 'response')) {
+      response.appendResponseLine('### Request failed with');
+      response.appendResponseLine(httpFailure.errorText);
+    }
+
+    // 重定向链
+    const redirectChain = httpRequest.redirectChain();
+    if (redirectChain.length && (dataType === 'all' || dataType === 'request')) {
+      response.appendResponseLine('### Redirect chain');
+      let indent = 0;
+      for (const req of redirectChain.reverse()) {
+        response.appendResponseLine(
+          `${'  '.repeat(indent)}${req.method()} ${req.url()} ${getStatusFromRequest(req)}`,
+        );
+        indent++;
       }
     }
   },

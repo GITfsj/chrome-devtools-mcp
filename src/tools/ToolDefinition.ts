@@ -6,7 +6,12 @@
 
 import type {TextSnapshotNode} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
-import type {Dialog, ElementHandle, Page} from '../third_party/index.js';
+import type {
+  Dialog,
+  ElementHandle,
+  HTTPRequest,
+  Page,
+} from '../third_party/index.js';
 import type {TraceResult} from '../trace-processing/parse.js';
 import type {PaginationOptions} from '../utils/types.js';
 
@@ -123,6 +128,10 @@ export type Context = Readonly<{
    * Returns a reqid for a cdpRequestId.
    */
   resolveCdpElementId(cdpBackendNodeId: number): string | undefined;
+  /**
+   * Returns a network request by its stable id (reqid).
+   */
+  getNetworkRequestById(reqid: number): HTTPRequest;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(
