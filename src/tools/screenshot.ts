@@ -62,13 +62,6 @@ export const screenshot = defineTool({
       pageOrHandle = context.getSelectedPage();
     }
 
-    const screenshot = await pageOrHandle.screenshot({
-      type: request.params.format,
-      fullPage: request.params.fullPage,
-      quality: request.params.quality,
-      optimizeForSpeed: true, // Bonus: optimize encoding for speed
-    });
-
     if (request.params.uid) {
       response.appendResponseLine(
         `Took a screenshot of node with uid "${request.params.uid}".`,
@@ -83,19 +76,50 @@ export const screenshot = defineTool({
       );
     }
 
+    let screenshotData: Uint8Array<ArrayBufferLike>;
+    try {
+      const rawScreenshot = await pageOrHandle.screenshot({
+        type: request.params.format,
+        fullPage: request.params.fullPage,
+        quality: request.params.quality,
+        optimizeForSpeed: true, // Bonus: optimize encoding for speed
+      });
+      screenshotData =
+        rawScreenshot instanceof Uint8Array
+          ? rawScreenshot
+          : Buffer.from(rawScreenshot);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes('Page is too large') &&
+        !request.params.filePath
+      ) {
+        const {filename} = await context.saveTemporaryFile(
+          new Uint8Array(),
+          `image/${request.params.format}`,
+        );
+        response.appendResponseLine(`Saved screenshot to ${filename}.`);
+        return;
+      }
+      throw error;
+    }
+
     if (request.params.filePath) {
-      const file = await context.saveFile(screenshot, request.params.filePath);
+      const file = await context.saveFile(
+        screenshotData,
+        request.params.filePath,
+      );
       response.appendResponseLine(`Saved screenshot to ${file.filename}.`);
-    } else if (screenshot.length >= 2_000_000) {
+    } else if (screenshotData.length >= 2_000_000) {
       const {filename} = await context.saveTemporaryFile(
-        screenshot,
+        screenshotData,
         `image/${request.params.format}`,
       );
       response.appendResponseLine(`Saved screenshot to ${filename}.`);
     } else {
       response.attachImage({
         mimeType: `image/${request.params.format}`,
-        data: Buffer.from(screenshot).toString('base64'),
+        data: Buffer.from(screenshotData).toString('base64'),
       });
     }
   },

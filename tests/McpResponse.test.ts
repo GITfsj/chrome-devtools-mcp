@@ -385,6 +385,26 @@ describe('McpResponse network request filtering', () => {
       t.assert.snapshot?.(result[0].text);
     });
   });
+
+  it('filters network requests by filterText', async () => {
+    await withBrowser(async (response, context) => {
+      response.setIncludeNetworkRequests(true, {
+        filterText: 'get-1',
+      });
+      context.getNetworkRequests = () => {
+        return [
+          getMockRequest({method: 'GET-0'}),
+          getMockRequest({method: 'GET-1'}),
+          getMockRequest({method: 'POST-1'}),
+        ];
+      };
+      const result = await response.handle('test', context);
+      const text = (result[0].text as string).toString();
+      assert.ok(text.includes('GET-1'));
+      assert.ok(!text.includes('GET-0'));
+      assert.ok(!text.includes('POST-1'));
+    });
+  });
 });
 
 describe('McpResponse network pagination', () => {

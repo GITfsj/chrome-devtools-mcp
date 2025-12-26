@@ -68,6 +68,7 @@ export interface Response {
       includePreservedRequests?: boolean;
       networkRequestIdInDevToolsUI?: number;
       reverse?: boolean;
+      filterText?: string;
     },
   ): void;
   setIncludeConsoleData(

@@ -177,6 +177,35 @@ describe('network', () => {
         assert.ok(twoIndex < threeIndex);
       });
     });
+
+    it('filters requests by filterText', async () => {
+      server.addHtmlRoute('/one', html`<main>First</main>`);
+      server.addHtmlRoute('/two', html`<main>Second</main>`);
+      server.addHtmlRoute('/three', html`<main>Third</main>`);
+
+      await withBrowser(async (response, context) => {
+        await context.setUpNetworkCollectorForTesting();
+        const page = context.getSelectedPage();
+        await page.goto(server.getRoute('/one'));
+        await page.goto(server.getRoute('/two'));
+        await page.goto(server.getRoute('/three'));
+        await listNetworkRequests.handler(
+          {
+            params: {
+              includePreservedRequests: true,
+              filterText: 'two',
+            },
+          },
+          response,
+          context,
+        );
+        const responseData = await response.handle('list_request', context);
+        const textContent = responseData[0] as {text: string};
+        assert.ok(textContent.text.includes('/two'));
+        assert.ok(!textContent.text.includes('/one'));
+        assert.ok(!textContent.text.includes('/three'));
+      });
+    });
   });
   describe('network_get_request', () => {
     it('attaches request', async () => {
@@ -333,7 +362,7 @@ describe('network', () => {
         const listText = listResponse[0] as {text: string};
         
         // 从列表中找到 reqid（通常格式为 reqid=1）
-        const reqidMatch = listText.text.match(/reqid=(\\d+)/);
+        const reqidMatch = listText.text.match(/reqid=(\d+)/);
         assert.ok(reqidMatch, 'Should find reqid in list response');
         
         const reqid = parseInt(reqidMatch[1], 10);

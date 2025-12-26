@@ -3,7 +3,7 @@ exports[`network > network_get_request > should get request from previous naviga
 ## Request http://localhost:<port>/one
 Status:  [success - 200]
 ### Request Headers
-- accept-language:en-US,en;q=0.9
+- accept-language:zh-CN,zh;q=0.9
 - upgrade-insecure-requests:1
 - user-agent:<user-agent>
 - sec-ch-ua:"Not_A Brand";v="99", "Chromium";v="142"

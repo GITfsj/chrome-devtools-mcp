@@ -75,6 +75,13 @@ export const listNetworkRequests = defineTool({
       .describe(
         'Set to true to return the preserved requests over the last 3 navigations.',
       ),
+    filterText: zod
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        'Optional text to filter network requests. Matches URL, method, status, or reqid (case-insensitive).',
+      ),
     reverse: zod
       .boolean()
       .default(true)
@@ -95,6 +102,7 @@ export const listNetworkRequests = defineTool({
       pageIdx: 0,
       resourceTypes: request.params.resourceTypes,
       includePreservedRequests: request.params.includePreservedRequests,
+      filterText: request.params.filterText,
       networkRequestIdInDevToolsUI: reqid,
       reverse: request.params.reverse,
     });
@@ -160,6 +168,9 @@ export const getNetworkDetail = defineTool({
   handler: async (request, response, context) => {
     const {reqid, dataType = 'all'} = request.params;
 
+    // Attach the network request so McpResponse can format it and tests can assert on it.
+    response.attachNetworkRequest(reqid);
+
     // 获取网络请求对象
     let httpRequest;
     try {
@@ -172,6 +183,20 @@ export const getNetworkDetail = defineTool({
     }
 
     const httpResponse = httpRequest.response();
+
+    if (dataType === 'all') {
+      response.appendResponseLine(
+        'Fetching both request and response data for this network request.',
+      );
+    } else if (dataType === 'request') {
+      response.appendResponseLine(
+        'Fetching request data only for this network request.',
+      );
+    } else {
+      response.appendResponseLine(
+        'Fetching response data only for this network request.',
+      );
+    }
     
     // 根据 dataType 构建响应内容
     response.appendResponseLine(`## Request ${httpRequest.url()}`);
@@ -179,11 +204,10 @@ export const getNetworkDetail = defineTool({
 
     // 包含请求数据
     if (dataType === 'all' || dataType === 'request') {
-      // The header's context is too long
-      // response.appendResponseLine('### Request Headers');
-      // for (const line of getFormattedHeaderValue(httpRequest.headers())) {
-      //   response.appendResponseLine(line);
-      // }
+      response.appendResponseLine('### Request Headers');
+      for (const line of getFormattedHeaderValue(httpRequest.headers())) {
+        response.appendResponseLine(line);
+      }
 
       const requestBody = await getFormattedRequestBody(httpRequest);
       if (requestBody) {

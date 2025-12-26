@@ -47,6 +47,7 @@ export class McpResponse implements Response {
     includePreservedRequests?: boolean;
     networkRequestIdInDevToolsUI?: number;
     reverse?: boolean;
+    filterText?: string;
   };
   #consoleDataOptions?: {
     include: boolean;
@@ -79,6 +80,7 @@ export class McpResponse implements Response {
       includePreservedRequests?: boolean;
       networkRequestIdInDevToolsUI?: number;
       reverse?: boolean;
+      filterText?: string;
     },
   ): void {
     if (!value) {
@@ -99,6 +101,7 @@ export class McpResponse implements Response {
       includePreservedRequests: options?.includePreservedRequests,
       networkRequestIdInDevToolsUI: options?.networkRequestIdInDevToolsUI,
       reverse: options?.reverse,
+      filterText: options?.filterText,
     };
   }
 
@@ -407,6 +410,25 @@ Call ${handleDialog.name} to handle it before continuing.`);
         requests = requests.filter(request => {
           const type = request.resourceType();
           return normalizedTypes.has(type);
+        });
+      }
+
+      // Apply text filtering if specified
+      const filterText = this.#networkRequestsOptions.filterText
+        ?.toLowerCase()
+        .trim();
+      if (filterText) {
+        requests = requests.filter(request => {
+          const stableId = context.getNetworkRequestStableId(request);
+          const haystack = [
+            request.url(),
+            request.method(),
+            getStatusFromRequest(request),
+            String(stableId),
+          ]
+            .join(' ')
+            .toLowerCase();
+          return haystack.includes(filterText);
         });
       }
 
